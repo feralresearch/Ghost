@@ -186,8 +186,8 @@ const createSessionFromMagicLink = async function (req, res, next) {
     // req.query is a plain object, copy it to a URLSearchParams object so we can call toString()
     const searchParams = new URLSearchParams('');
     Object.keys(req.query).forEach((param) => {
-        // don't copy the token param
-        if (param !== 'token') {
+        // don't copy the token or referer params
+        if (!(param === 'token' || param === 'referer')) {
             searchParams.set(param, req.query[param]);
         }
     });
@@ -233,13 +233,20 @@ const createSessionFromMagicLink = async function (req, res, next) {
             }
         }
 
-        // Do a standard 302 redirect to the homepage, with success=true
+        // Do a 302 redirect to referrer if provided, with success=true
         searchParams.set('success', true);
-        res.redirect(`${urlUtils.getSubdir()}/?${searchParams.toString()}`);
+        const { referer } = req.query;
+        if (referer) {
+            const refererString = Buffer.from(referer, 'base64').toString('utf8');
+            const destination = new URL(refererString).pathname;
+            res.redirect(`${destination}?${searchParams.toString()}`);
+        } else {
+            res.redirect(`${urlUtils.getSubdir()}/?${searchParams.toString()}`);
+        }
     } catch (err) {
         logging.warn(err.message);
 
-        // Do a standard 302 redirect to the homepage, with success=false
+        // Do a 302 redirect to the homepage, with success=false
         searchParams.set('success', false);
         res.redirect(`${urlUtils.getSubdir()}/?${searchParams.toString()}`);
     }
