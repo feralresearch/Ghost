@@ -186,14 +186,16 @@ const createSessionFromMagicLink = async function (req, res, next) {
     // req.query is a plain object, copy it to a URLSearchParams object so we can call toString()
     const searchParams = new URLSearchParams('');
     Object.keys(req.query).forEach((param) => {
-        // don't copy the token or referer params
-        if (!(param === 'token' || param === 'referer')) {
+        // don't copy the token param
+        if (param !== 'token') {
             searchParams.set(param, req.query[param]);
         }
     });
 
     try {
+
         const member = await membersService.ssr.exchangeTokenForSession(req, res);
+        const referer = await membersService.api.getRefererFromMagicLinkToken(req.query.token);
         const subscriptions = member && member.subscriptions || [];
 
         const action = req.query.action;
@@ -235,14 +237,10 @@ const createSessionFromMagicLink = async function (req, res, next) {
 
         // Do a 302 redirect to referrer if provided, with success=true
         searchParams.set('success', true);
-        const { referer } = req.query;
-        if (referer) {
-            const refererString = Buffer.from(referer, 'base64').toString('utf8');
-            const destination = new URL(refererString).pathname;
-            res.redirect(`${destination}?${searchParams.toString()}`);
-        } else {
-            res.redirect(`${urlUtils.getSubdir()}/?${searchParams.toString()}`);
-        }
+        res.redirect(referer?
+            `${referer}?${searchParams.toString()}`:
+            `${urlUtils.getSubdir()}/?${searchParams.toString()}`);
+        
     } catch (err) {
         logging.warn(err.message);
 
