@@ -193,7 +193,9 @@ const createSessionFromMagicLink = async function (req, res, next) {
     });
 
     try {
+
         const member = await membersService.ssr.exchangeTokenForSession(req, res);
+        const referer = await membersService.api.getRefererFromMagicLinkToken(req.query.token);
         const subscriptions = member && member.subscriptions || [];
 
         const action = req.query.action;
@@ -233,13 +235,16 @@ const createSessionFromMagicLink = async function (req, res, next) {
             }
         }
 
-        // Do a standard 302 redirect to the homepage, with success=true
+        // Do a 302 redirect to referrer if provided, with success=true
         searchParams.set('success', true);
-        res.redirect(`${urlUtils.getSubdir()}/?${searchParams.toString()}`);
+        res.redirect(referer?
+            `${referer}?${searchParams.toString()}`:
+            `${urlUtils.getSubdir()}/?${searchParams.toString()}`);
+        
     } catch (err) {
         logging.warn(err.message);
 
-        // Do a standard 302 redirect to the homepage, with success=false
+        // Do a 302 redirect to the homepage, with success=false
         searchParams.set('success', false);
         res.redirect(`${urlUtils.getSubdir()}/?${searchParams.toString()}`);
     }
